@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Copy Draw - Equilibrado</title>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding: 20px; }
+        .stats { font-size: 1.5rem; margin-bottom: 10px; color: #00ff88; }
+        .container { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
+        canvas { border: 4px solid #444; background-color: #fff; cursor: crosshair; border-radius: 12px; touch-action: none; }
+        .canvas-box h3 { margin: 10px 0; color: #bbb; text-align: center; }
+        .controls { margin-top: 20px; display: flex; gap: 15px; }
+        button { padding: 12px 25px; font-size: 1rem; cursor: pointer; border: none; border-radius: 8px; font-weight: bold; transition: 0.2s; }
+        .btn-clear { background-color: #ff4757; color: white; }
+        .btn-check { background-color: #2ed573; color: white; }
+        #feedback { margin-top: 15px; font-size: 1.2rem; font-weight: bold; height: 1.5em; }
+        .progress-bar { width: 320px; height: 12px; background: #333; border-radius: 6px; margin-top: 15px; overflow: hidden; }
+        #progress-fill { width: 0%; height: 100%; background: #00ff88; transition: 0.3s; }
+    </style>
+</head>
+<body>
+
+    <div class="stats">Nível: <span id="level-display">1</span> / 50</div>
+    
+    <div class="container">
+        <div class="canvas-box">
+            <h3>Molde</h3>
+            <canvas id="targetCanvas" width="300" height="300"></canvas>
+        </div>
+        <div class="canvas-box">
+            <h3>Seu Desenho</h3>
+            <canvas id="userCanvas" width="300" height="300"></canvas>
+        </div>
+    </div>
+
+    <div class="progress-bar"><div id="progress-fill"></div></div>
+    <div id="feedback">Tente copiar o contorno!</div>
+
+    <div class="controls">
+        <button class="btn-clear" onclick="clearUserCanvas()">Limpar</button>
+        <button class="btn-check" onclick="checkDrawing()">Verificar (70%)</button>
+    </div>
+
+    <script>
+        const tCanvas = document.getElementById('targetCanvas');
+        const uCanvas = document.getElementById('userCanvas');
+        const tCtx = tCanvas.getContext('2d', { willReadFrequently: true });
+        const uCtx = uCanvas.getContext('2d', { willReadFrequently: true });
+        
+        // Canvas invisível para processar a "margem de erro" (Blur)
+        const blurCanvas = document.createElement('canvas');
+        blurCanvas.width = blurCanvas.height = 300;
+        const bCtx = blurCanvas.getContext('2d', { willReadFrequently: true });
+
+        let drawing = false;
+        let currentLevel = 1;
+
+        const setupStyle = (ctx) => {
+            ctx.lineWidth = 8;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = '#000';
+        };
+
+        setupStyle(tCtx);
+        setupStyle(uCtx);
+
+        uCanvas.addEventListener('mousedown', () => drawing = true);
+        window.addEventListener('mouseup', () => { drawing = false; uCtx.beginPath(); });
+        uCanvas.addEventListener('mousemove', draw);
+
+        function draw(e) {
+            if (!drawing) return;
+            const rect = uCanvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            uCtx.lineTo(x, y);
+            uCtx.stroke();
+            uCtx.beginPath();
+            uCtx.moveTo(x, y);
+        }
+
+        function clearUserCanvas() {
+            uCtx.clearRect(0, 0, 300, 300);
+            document.getElementById('progress-fill').style.width = "0%";
+            document.getElementById('feedback').innerText = "Tela limpa!";
+        }
+
+        function checkDrawing() {
+            // 1. Criar versão "borrada" do molde para tolerância
+            bCtx.clearRect(0, 0, 300, 300);
+            bCtx.filter = 'blur(8px)'; // Margem de 8px de tolerância
+            bCtx.drawImage(tCanvas, 0, 0);
+            
+            const tData = bCtx.getImageData(0, 0, 300, 300).data;
+            const uData = uCtx.getImageData(0, 0, 300, 300).data;
+            
+            let hits = 0;
+            let totalTarget = 0;
+            let misses = 0;
+
+            for (let i = 3; i < tData.length; i += 4) {
+                const targetAlpha = tData[i];
+                const userAlpha = uData[i];
+
+                if (targetAlpha > 20) { // Onde tem molde (ou perto dele)
+                    totalTarget++;
+                    if (userAlpha > 50) hits++;
+                } else if (userAlpha > 50) { // Onde NÃO tem molde
+                    misses++;
+                }
+            }
+
+            // Cálculo equilibrado: Acertos menos uma penalidade leve por rabiscos fora
+            let score = ((hits - (misses * 0.4)) / totalTarget) * 100;
+            score = Math.max(0, Math.floor(score + 10)); // Bônus de "generosidade"
+            if (score > 100) score = 100;
+
+            document.getElementById('progress-fill').style.width = score + "%";
+            const feedback = document.getElementById('feedback');
+
+            if (score >= 70) {
+                feedback.innerHTML = `<span style="color:#00ff88">${score}% - Muito bom! Próximo nível...</span>`;
+                setTimeout(nextLevel, 1200);
+            } else {
+                feedback.innerHTML = `<span style="color:#ff4757">${score}% - Quase lá! Tente seguir mais a linha.</span>`;
+            }
+        }
+
+        function nextLevel() {
+            if (currentLevel < 50) {
+                currentLevel++;
+                document.getElementById('level-display').innerText = currentLevel;
+                clearUserCanvas();
+                drawShape(currentLevel);
+            } else {
+                alert("Você completou os 50 níveis!");
+            }
+        }
+
+        function drawShape(lvl) {
+            tCtx.clearRect(0, 0, 300, 300);
+            tCtx.beginPath();
+            const c = 150;
+            
+            // Lógica de formas (mesma do anterior, mas com 50 variações)
+            if (lvl === 1) tCtx.arc(c, c, 70, 0, Math.PI*2);
+            else if (lvl === 2) tCtx.rect(80, 80, 140, 140);
+            else if (lvl === 3) { tCtx.moveTo(c, 70); tCtx.lineTo(70, 230); tCtx.lineTo(230, 230); tCtx.closePath(); }
+            else if (lvl === 4) { // Coração
+                tCtx.moveTo(c, 110);
+                tCtx.bezierCurveTo(c, 80, 80, 80, 80, 120);
+                tCtx.bezierCurveTo(80, 180, c, 220, c, 250);
+                tCtx.bezierCurveTo(c, 220, 220, 180, 220, 120);
+                tCtx.bezierCurveTo(220, 80, c, 80, c, 110);
+            } else {
+                // Polígonos dinâmicos para chegar a 50
+                const sides = 3 + (lvl % 8);
+                const rot = (lvl * 10) * Math.PI / 180;
+                for(let i=0; i<=sides; i++) {
+                    const a = (i * 2 * Math.PI) / sides + rot;
+                    const x = c + 80 * Math.cos(a);
+                    const y = c + 80 * Math.sin(a);
+                    if(i===0) tCtx.moveTo(x,y); else tCtx.lineTo(x,y);
+                }
+            }
+            tCtx.stroke();
+        }
+
+        drawShape(1);
+    </script>
+</body>
+</html>
