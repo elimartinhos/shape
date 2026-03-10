@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cópia Cara!</title>
+    <title>Shape by elimartinhos</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding: 15px; min-height: 100vh; overflow-x: hidden; }
         .stats { font-size: 1.4rem; margin-bottom: 10px; color: #00ff88; font-weight: bold; }
@@ -37,7 +37,7 @@
     </div>
 
     <div class="progress-bar"><div id="progress-fill"></div></div>
-    <div id="feedback">Copie o contorno!</div>
+    <div id="feedback">Copie a forma!</div>
 
     <div class="controls">
         <button class="btn-clear" onclick="clearUserCanvas()">Limpar</button>
@@ -60,7 +60,7 @@
         let currentLevel = 1;
 
         const setupStyle = (ctx) => {
-            ctx.lineWidth = 8;
+            ctx.lineWidth = 10;
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             ctx.strokeStyle = '#000';
@@ -102,64 +102,50 @@
         function clearUserCanvas() {
             uCtx.clearRect(0, 0, 300, 300);
             document.getElementById('progress-fill').style.width = "0%";
-            document.getElementById('feedback').innerText = "Desenhe novamente!";
+            document.getElementById('feedback').innerText = "Tente novamente!";
         }
 
         function checkDrawing() {
             bCtx.clearRect(0, 0, 300, 300);
-            bCtx.filter = 'blur(6px)'; 
+            bCtx.filter = 'blur(10px)'; // Aumentada a aura de tolerância (estava 6)
             bCtx.drawImage(tCanvas, 0, 0);
             
             const tData = bCtx.getImageData(0, 0, 300, 300).data;
             const uData = uCtx.getImageData(0, 0, 300, 300).data;
             const rawTData = tCtx.getImageData(0, 0, 300, 300).data;
             
-            let hits = 0, totalTargetArea = 0, userTotalInk = 0, targetTotalInk = 0;
+            let hits = 0, totalTargetArea = 0, userInk = 0, targetInk = 0;
 
             for (let i = 3; i < tData.length; i += 4) {
-                const blurTarget = tData[i];
-                const rawTarget = rawTData[i];
-                const userInk = uData[i];
+                if (rawTData[i] > 50) targetInk++;
+                if (uData[i] > 50) userInk++;
 
-                if (rawTarget > 50) targetTotalInk++;
-                if (userInk > 50) userTotalInk++;
-
-                if (blurTarget > 20) {
+                if (tData[i] > 15) {
                     totalTargetArea++;
-                    if (userInk > 50) hits++;
+                    if (uData[i] > 50) hits++;
                 }
             }
 
-            // LÓGICA ANTI-BORRÃO: 
-            // 1. Precisão: O quanto você acertou a "aura" do desenho.
             let accuracy = (hits / totalTargetArea) * 100;
-
-            // 2. Proporção de Tinta: Se você usou muito mais tinta que o molde, é um borrão.
-            let inkRatio = userTotalInk / targetTotalInk;
+            let inkRatio = userInk / targetInk;
             let inkPenalty = 1;
-            if (inkRatio > 1.4) {
-                // Penaliza se tiver mais de 40% de excesso de tinta
-                inkPenalty = Math.max(0, 1 - (inkRatio - 1.4));
-            } else if (inkRatio < 0.5) {
-                // Penaliza se desenhou muito pouco
-                inkPenalty = inkRatio;
+
+            // Ficou levemente mais fácil: aceita até 1.8x a tinta do molde sem punir muito (estava 1.4)
+            if (inkRatio > 1.8) {
+                inkPenalty = Math.max(0.1, 1 - (inkRatio - 1.8) * 0.6);
             }
 
             let finalScore = Math.floor(accuracy * inkPenalty);
-            
-            // Bônus de conforto (pequeno ajuste para compensar mouse)
-            if (finalScore > 10 && finalScore < 90) finalScore += 5;
-            finalScore = Math.min(100, Math.max(0, finalScore));
+            finalScore = Math.min(100, finalScore + 10); // Bônus fixo de facilidade
 
             document.getElementById('progress-fill').style.width = finalScore + "%";
             const f = document.getElementById('feedback');
 
             if (finalScore >= 70) {
-                f.innerHTML = `<span style="color:#00ff88">${finalScore}% - Passou!</span>`;
+                f.innerHTML = `<span style="color:#00ff88">${finalScore}% - Ótimo! Próximo nível...</span>`;
                 setTimeout(nextLevel, 1000);
             } else {
-                let msg = finalScore < 30 && inkRatio > 2 ? "Borrão detectado!" : "Siga a linha!";
-                f.innerHTML = `<span style="color:#ff4757">${finalScore}% - ${msg}</span>`;
+                f.innerHTML = `<span style="color:#ff4757">${finalScore}% - Precisa ser mais preciso.</span>`;
             }
         }
 
@@ -170,7 +156,7 @@
                 clearUserCanvas();
                 drawShape(currentLevel);
             } else {
-                document.getElementById('feedback').innerText = "VENCEDOR FINAL!";
+                document.getElementById('feedback').innerText = "FIM DE JOGO! VOCÊ É FERA!";
             }
         }
 
@@ -204,4 +190,3 @@
     </script>
 </body>
 </html>
-
