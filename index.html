@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shape by elimartinhos</title>
+    <title>Copy Draw - Equilibrado</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #1a1a1a; color: white; margin: 0; padding: 15px; min-height: 100vh; overflow-x: hidden; }
         .stats { font-size: 1.4rem; margin-bottom: 10px; color: #00ff88; font-weight: bold; }
@@ -11,7 +11,11 @@
         canvas { border: 3px solid #444; background-color: #fff; cursor: crosshair; border-radius: 12px; touch-action: none; max-width: 45vw; height: auto; }
         @media (max-width: 600px) { canvas { max-width: 90vw; } }
         .canvas-box h3 { margin: 8px 0; color: #bbb; text-align: center; font-size: 1rem; }
-        .controls { margin-top: 15px; display: flex; gap: 10px; width: 100%; justify-content: center; }
+        
+        /* Nova instrução acima dos botões */
+        .instruction { margin-top: 15px; font-size: 0.9rem; color: #00ff88; font-weight: bold; text-transform: uppercase; }
+        
+        .controls { margin-top: 10px; display: flex; gap: 10px; width: 100%; justify-content: center; }
         button { padding: 12px; font-size: 1rem; cursor: pointer; border: none; border-radius: 8px; font-weight: bold; transition: 0.2s; flex: 1; max-width: 140px; }
         .btn-clear { background-color: #444; color: white; }
         .btn-check { background-color: #2ed573; color: white; }
@@ -39,6 +43,7 @@
     <div class="progress-bar"><div id="progress-fill"></div></div>
     <div id="feedback">Copie a forma!</div>
 
+    <div class="instruction">Acerte pelo menos 70%</div>
     <div class="controls">
         <button class="btn-clear" onclick="clearUserCanvas()">Limpar</button>
         <button class="btn-check" onclick="checkDrawing()">Verificar</button>
@@ -107,7 +112,7 @@
 
         function checkDrawing() {
             bCtx.clearRect(0, 0, 300, 300);
-            bCtx.filter = 'blur(10px)'; // Aumentada a aura de tolerância (estava 6)
+            bCtx.filter = 'blur(10px)'; 
             bCtx.drawImage(tCanvas, 0, 0);
             
             const tData = bCtx.getImageData(0, 0, 300, 300).data;
@@ -130,13 +135,12 @@
             let inkRatio = userInk / targetInk;
             let inkPenalty = 1;
 
-            // Ficou levemente mais fácil: aceita até 1.8x a tinta do molde sem punir muito (estava 1.4)
             if (inkRatio > 1.8) {
                 inkPenalty = Math.max(0.1, 1 - (inkRatio - 1.8) * 0.6);
             }
 
             let finalScore = Math.floor(accuracy * inkPenalty);
-            finalScore = Math.min(100, finalScore + 10); // Bônus fixo de facilidade
+            finalScore = Math.min(100, finalScore + 10);
 
             document.getElementById('progress-fill').style.width = finalScore + "%";
             const f = document.getElementById('feedback');
